@@ -6,8 +6,9 @@ import feedparser
 import json
 import telegram
 from telegram import *
-from telegram.ext import Updater, CommandHandler, Job
+from telegram.ext import *
 from dateutil import parser
+#from sets import Set
 
 from datetime import datetime, timedelta
 import logging
@@ -25,6 +26,12 @@ db = './feeds.json'
 TOKEN = ""
 repeatsec = 12*3600
 running = False
+group_whitelist = []
+groups = set()
+class OnjoinFilter(BaseFilter):
+    def filter(self, message):
+        return message.new_chat_member is not None
+
 
 e_db = {}
 with open(db,'r') as f:
@@ -32,7 +39,12 @@ with open(db,'r') as f:
     if content is not '':
         e_db = json.loads(content)
 
-
+def CheckGroupWhitelist(bot,update):
+    groupId = update.message.chat_id
+    if groupId not in group_whitelist:
+        return False
+    return True
+        
 def is_in_db(ctf_id):
     """Helper function to check if a CTF is in the db"""
     if e_db.get(ctf_id) is None:
@@ -73,7 +85,8 @@ def check_ctfs(bot, job):
             ctf = e_db.get(ctf_id)
             message += "New CTF announced: "+ctf["title"]+" ID: "+ctf["id"]+"\n"
         if message is not "":
-            bot.sendMessage(job.context, text=message)
+            for element in groups:
+                bot.sendMessage(element, text=message)
     
     to_delete = []
     for ctf_id in e_db:
@@ -102,6 +115,8 @@ def alarm(bot, job):
 
 
 def start(bot, update, job_queue):
+    groups.add(update.message.chat_id)
+    print(groups)
     """This function is required. Without this your bot will not load any CTF"""
     global running
     running = True
@@ -120,6 +135,8 @@ def ping(bot, update):
     
 
 def remind(bot, update, args, job_queue, chat_data):
+    if CheckGroupWhitelist(bot,update) is False:
+        return
     """Adds a job to the queue"""
     global running
     chat_id = update.message.chat_id
@@ -164,6 +181,8 @@ def remind(bot, update, args, job_queue, chat_data):
 
 
 def unset(bot, update, args, chat_data):
+    if CheckGroupWhitelist(bot,update) is False:
+        return
     """Removes the job if the user changed their mind"""
     if len(args) != 1 :
         update.message.reply_text('Usage: `/unset <ctf_id>`',parse_mode='MARKDOWN')
@@ -237,6 +256,9 @@ def main():
     # Get the dispatcher to register handlers
     dp = updater.dispatcher
 
+    #initialize custom Filter
+    OnJoin_filter = OnjoinFilter()
+
     # on different commands - answer in Telegram
     dp.add_handler(CommandHandler("start", start, pass_job_queue=True))
     dp.add_handler(CommandHandler("ping", ping))
@@ -248,7 +270,7 @@ def main():
     dp.add_handler(CommandHandler("unset", unset, pass_args=True, pass_chat_data=True))
     dp.add_handler(CommandHandler("list", listctf))
     dp.add_handler(CommandHandler("info", info, pass_args=True))
-
+    dp.add_handler(MessageHandler(OnJoin_filter, CheckGroupWhitelist))
     # log all errors
     dp.add_error_handler(error)
 
