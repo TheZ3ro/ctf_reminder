@@ -28,10 +28,6 @@ repeatsec = 12*3600
 running = False
 group_whitelist = []
 groups = set()
-class OnjoinFilter(BaseFilter):
-    def filter(self, message):
-        return message.new_chat_member is not None
-
 
 e_db = {}
 with open(db,'r') as f:
@@ -256,8 +252,6 @@ def main():
     # Get the dispatcher to register handlers
     dp = updater.dispatcher
 
-    #initialize custom Filter
-    OnJoin_filter = OnjoinFilter()
 
     # on different commands - answer in Telegram
     dp.add_handler(CommandHandler("start", start, pass_job_queue=True))
@@ -270,7 +264,6 @@ def main():
     dp.add_handler(CommandHandler("unset", unset, pass_args=True, pass_chat_data=True))
     dp.add_handler(CommandHandler("list", listctf))
     dp.add_handler(CommandHandler("info", info, pass_args=True))
-    dp.add_handler(MessageHandler(OnJoin_filter, CheckGroupWhitelist))
     # log all errors
     dp.add_error_handler(error)
 
