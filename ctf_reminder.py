@@ -3,7 +3,7 @@
 
 # pip3 install feedparser python-telegram-bot python-dateutil
 import feedparser
-import json
+import yaml
 import telegram
 from telegram import *
 from telegram.ext import *
@@ -22,24 +22,32 @@ logger = logging.getLogger(__name__)
 
 feed_name = 'Upcoming CTF'
 url = 'https://ctftime.org/event/list/upcoming/rss/'
-db = './feeds.json'
-TOKEN = ""
+db = './feeds.yaml'
+groups_db = './groups.yaml'
+TOKEN = "" #insert bot token here
 repeatsec = 12*3600
 running = False
-group_whitelist = []
-groups = set()
+group_whitelist = [] #insert group id here
 
 e_db = {}
 with open(db,'r') as f:
     content = f.read()
     if content is not '':
-        e_db = json.loads(content)
+        e_db = yaml.load(content)
+
+groups = set()
+with open(groups_db,'r') as f:
+    content = f.read()
+    if content is not '':
+        groups = yaml.load(content)
+
 
 def CheckGroupWhitelist(bot,update):
     groupId = update.message.chat_id
     if groupId not in group_whitelist:
         return False
     return True
+
         
 def is_in_db(ctf_id):
     """Helper function to check if a CTF is in the db"""
@@ -65,7 +73,6 @@ def check_ctfs(bot, job):
         event["restrictions"] = post.restrictions
         event["start_date"] = post.start_date
         event["id"] = post.ctftime_url.split('/')[2]
-        event["remind"] = False
         
         # if post is already in the database, skip it
         # TODO check the time
@@ -79,10 +86,13 @@ def check_ctfs(bot, job):
         message = ""
         for ctf_id in posts_to_print:
             ctf = e_db.get(ctf_id)
-            message += "New CTF announced: "+ctf["title"]+" ID: "+ctf["id"]+"\n"
+            date = parser.parse(ctf["start_date"])
+            date_str = "{:%d-%m-%Y %H:%M UTC}".format(date)
+            message += "[{0}]({1}) ({2})\nStarting Date: *{3}*\n\n".format(ctf["title"], ctf["link"], str(ctf["id"]), date_str)
         if message is not "":
+            message = "*New CTF announced:*\n" + message
             for element in groups:
-                bot.sendMessage(element, text=message)
+                bot.sendMessage(element, text=message, parse_mode='MARKDOWN', disable_web_page_preview=True)
     
     to_delete = []
     for ctf_id in e_db:
@@ -94,7 +104,7 @@ def check_ctfs(bot, job):
         del e_db[d]
     
     with open(db, 'w') as f:
-        f.write(json.dumps(e_db))
+        yaml.dump(e_db, f)
 
 
 def alarm(bot, job):
@@ -112,7 +122,9 @@ def alarm(bot, job):
 
 def start(bot, update, job_queue):
     groups.add(update.message.chat_id)
-    print(groups)
+    with open(groups_db, 'w') as f:
+        yaml.dump(groups, f)
+
     """This function is required. Without this your bot will not load any CTF"""
     global running
     running = True
@@ -163,6 +175,8 @@ def remind(bot, update, args, job_queue, chat_data):
         context["chat_id"] = chat_id
         context["ctf_id"] = ctf["id"]
         job = Job(alarm, due, repeat=False, context=context)
+
+        reminded.append(ctf["id"])
         
         if 'job' not in chat_data:
             chat_data['job'] = {}
@@ -196,6 +210,9 @@ def unset(bot, update, args, chat_data):
         
     job.schedule_removal()
     del chat_data['job'][args[0]]
+    
+    try: reminded.remove(args[0])
+    except: pass
 
     update.message.reply_text('Timer successfully unset!')
 
@@ -205,15 +222,57 @@ def listctf(bot, update):
     message = ""
     for ctf_id in e_db:
         ctf = e_db[ctf_id]
-        message += "CTF: "+ctf["title"]+" ID: "+str(ctf["id"])+"\n"
+        date = parser.parse(ctf["start_date"])
+        date_str = "{:%d-%m-%Y}".format(date)
+        message += "[{0}]({1}) ({2}) - _{3}_\n".format(ctf["title"], ctf["link"], str(ctf["id"]), date_str)
+
     if message is not "":
-        bot.sendMessage(update.message.chat_id, text=message)
+        message = "*All future Events:*\n" + message
+        bot.sendMessage(update.message.chat_id, text=message, parse_mode='MARKDOWN', disable_web_page_preview=True)
+
+
+def remindctf(bot, update):
+    """List all CTFs that will be reminded"""
+    message = ""
+    for ctf_id in reminded:
+        ctf = e_db[ctf_id]
+        date = parser.parse(ctf["start_date"])
+        date_str = "{:%d-%m-%Y %H:%M UTC}".format(date)
+        message += "[{0}]({1}) ({2})\nStarting Date: *{3}*\n\n".format(ctf["title"], ctf["link"], str(ctf["id"]), date_str)
+
+    if message is not "":
+        message = "*Events with Reminders:*\n" + message
+        bot.sendMessage(update.message.chat_id, text=message, parse_mode='MARKDOWN', disable_web_page_preview=True)
+
+
+def upcomingctf(bot, update):
+    """List 5 upcoming CTFs in database"""
+    message = "*Upcoming events:*\n"
+    upcoming_ctfs = []
+    for ctf_id in e_db:
+        upcoming_ctfs.append([e_db[ctf_id]["id"],e_db[ctf_id]["start_date"]])
+
+    upcoming_ctfs.sort(key=lambda x: x[1])
+
+    i = 0
+    for ctf_id in upcoming_ctfs:
+        if i>=5:
+            break
+        ctf = e_db[ctf_id[0]]
+        date = parser.parse(ctf["start_date"])
+        date_str = "{:%d-%m-%Y %H:%M UTC}".format(date)
+        message += "[{0}]({1}) ({2})\nStarting Date: *{3}*\n\n".format(ctf["title"], ctf["link"], str(ctf["id"]), date_str)
+        i+=1
+
+    if message is not "":
+        bot.sendMessage(update.message.chat_id, text=message, parse_mode='MARKDOWN', disable_web_page_preview=True)
+
 
 
 def info(bot, update, args):
     """Get info form a given CTFid"""
     if len(args) != 1 :
-        update.message.reply_text('Usage: `/info <ctf_id>`',parse_mode='MARKDOWN')
+        update.message.reply_text('Usage: `/info <ctf_id>`', parse_mode='MARKDOWN')
         return
     
     ctf = e_db.get(args[0])
@@ -223,17 +282,19 @@ def info(bot, update, args):
         
     date = parser.parse(ctf["start_date"])
     
-    message = ctf["title"]+"\n"+ctf["link"]+"\n"
-    message += "Type: "+ctf["format_text"]+(" On site" if ctf["onsite"] else " Online")+"\n"
-    message += "Restriction: "+ctf["restrictions"]+"\n"
-    message += "Start Date: {:%Y/%m/%d %H:%M} UTC\n".format(date)
-    update.message.reply_text(message)
+    message = "[{0}]({1})\n".format(ctf["title"], ctf["link"])
+    message += "Type: *"+ctf["format_text"]+(" On site" if ctf["onsite"] else " Online")+"*\n"
+    message += "Restriction: *"+ctf["restrictions"]+"*\n"
+    message += "Start Date: *{:%d/%m/%Y %H:%M} UTC*\n".format(date)
+    update.message.reply_text(message, parse_mode='MARKDOWN', disable_web_page_preview=True)
     
 
 def usage(bot, update):
     message = "*CTF Reminder* will remind your CTF as they start!\n"
     message += "`/start` to start the reminder\n"
-    message += "`/list` to list all the upcoming CTFs\n"
+    message += "`/upcoming` to list all the upcoming CTFs\n"
+    message += "`/toremind` to list all the CTFs with reminder\n"
+    message += "`/list` to list all the future CTFs\n"
     message += "`/info <ctf_id>` to get info for specific CTF\n"
     message += "`/remind <ctf_id>` to set a CTF reminder\n"
     message += "`/unset <ctf_id>` to unset a CTF reminder\n"
@@ -263,6 +324,8 @@ def main():
                                   pass_chat_data=True))
     dp.add_handler(CommandHandler("unset", unset, pass_args=True, pass_chat_data=True))
     dp.add_handler(CommandHandler("list", listctf))
+    dp.add_handler(CommandHandler("upcoming", upcomingctf))
+    dp.add_handler(CommandHandler("toremind", remindctf))
     dp.add_handler(CommandHandler("info", info, pass_args=True))
     # log all errors
     dp.add_error_handler(error)
