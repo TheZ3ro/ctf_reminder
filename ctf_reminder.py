@@ -28,6 +28,7 @@ TOKEN = "" #insert bot token here
 repeatsec = 12*3600
 running = False
 group_whitelist = [] #insert group id here
+reminded = set()
 
 e_db = {}
 with open(db,'r') as f:
@@ -176,7 +177,7 @@ def remind(bot, update, args, job_queue, chat_data):
         context["ctf_id"] = ctf["id"]
         job = Job(alarm, due, repeat=False, context=context)
 
-        reminded.append(ctf["id"])
+        reminded.add(ctf["id"])
         
         if 'job' not in chat_data:
             chat_data['job'] = {}
