@@ -59,6 +59,7 @@ def is_in_db(ctf_id):
 
         
 def check_ctfs(bot, job):
+    
     """Job function to update the CTF db with new announced CTFs"""
     feed = feedparser.parse(url)
 
@@ -233,6 +234,9 @@ def listctf(bot, update):
 
 
 def remindctf(bot, update):
+    if CheckGroupWhitelist(bot,update) is False:
+        return
+    
     """List all CTFs that will be reminded"""
     message = ""
     for ctf_id in reminded:
