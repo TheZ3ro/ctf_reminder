@@ -239,8 +239,14 @@ def remindctf(bot, update):
     
     """List all CTFs that will be reminded"""
     message = ""
+    
+    # Get and sort by date list of CTF to remind
+    ctf_list = []
     for ctf_id in reminded:
-        ctf = e_db[ctf_id]
+        ctf_list.append(e_db[ctf_id])
+    ctf_list = sorted(ctf_list, key=lambda i: i['start_date'])
+
+    for ctf in ctf_list:
         date = parser.parse(ctf["start_date"])
         date_str = "{:%d-%m-%Y %H:%M UTC}".format(date)
         message += "[{0}]({1}) ({2})\nStarting Date: *{3}*\n\n".format(ctf["title"], ctf["link"], str(ctf["id"]), date_str)
