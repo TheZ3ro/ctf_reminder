@@ -20,27 +20,27 @@ logging.basicConfig(format='%(asctime)s - %(name)s - %(levelname)s - %(message)s
 
 logger = logging.getLogger(__name__)
 
-feed_name = 'Upcoming CTF'
-url = 'https://ctftime.org/event/list/upcoming/rss/'
-db = './feeds.yaml'
+feed_url = 'https://ctftime.org/event/list/upcoming/rss/'
+feed_db = './feeds.yaml'
 groups_db = './groups.yaml'
+events = {}
+groups = set()
+
 TOKEN = "" #insert bot token here
-repeatsec = 12*3600
-running = False
 group_whitelist = [] #insert group id here
+repeatsec = 12*3600
 reminded = set()
 
-e_db = {}
-with open(db,'r') as f:
-    content = f.read()
-    if content is not '':
-        e_db = yaml.load(content)
 
-groups = set()
-with open(groups_db,'r') as f:
-    content = f.read()
-    if content is not '':
-        groups = yaml.load(content)
+def loadYamlFile(filename):
+    try:
+        with open(filename,'r') as f:
+            content = f.read()
+            if content is not '':
+                return yaml.load(content)
+    except FileNotFoundError:
+        with open(filename,'w+') as f:
+            f.write("")
 
 
 def CheckGroupWhitelist(bot,update):
@@ -52,16 +52,15 @@ def CheckGroupWhitelist(bot,update):
         
 def is_in_db(ctf_id):
     """Helper function to check if a CTF is in the db"""
-    if e_db.get(ctf_id) is None:
+    if events.get(ctf_id) is None:
         return False      
     else:
         return True
 
         
-def check_ctfs(bot, job):
-    
-    """Job function to update the CTF db with new announced CTFs"""
-    feed = feedparser.parse(url)
+def update_data():
+    """Function to update the CTF db with new announced CTFs"""
+    feed = feedparser.parse(feed_url)
 
     posts_to_print = []
 
@@ -74,6 +73,7 @@ def check_ctfs(bot, job):
         event["onsite"] = not bool(post.onsite)
         event["restrictions"] = post.restrictions
         event["start_date"] = post.start_date
+        event["finish_date"] = post.finish_date
         event["id"] = post.ctftime_url.split('/')[2]
         
         # if post is already in the database, skip it
@@ -82,12 +82,31 @@ def check_ctfs(bot, job):
             if event["format"] == 1 and event["onsite"] is False:
                 posts_to_print.append(event["id"])
             ctf_id = event["id"]
-            e_db[ctf_id] = event
+            events[ctf_id] = event
     
+    to_delete = []
+    for ctf_id in events:
+        ctf = events[ctf_id]
+        if parser.parse(ctf["finish_date"]) < datetime.now():
+            to_delete.append(ctf_id)
+            
+    for d in to_delete:
+        del events[d]
+    
+    with open(feed_db, 'w') as f:
+        yaml.dump(events, f)
+
+    return posts_to_print
+
+
+def check_ctfs(bot, job):
+    """Job function to check for new announced CTFs"""
+    posts_to_print = update_data()
+
     if posts_to_print is not []:
         message = ""
         for ctf_id in posts_to_print:
-            ctf = e_db.get(ctf_id)
+            ctf = events.get(ctf_id)
             date = parser.parse(ctf["start_date"])
             date_str = "{:%d-%m-%Y %H:%M UTC}".format(date)
             message += "[{0}]({1}) ({2})\nStarting Date: *{3}*\n\n".format(ctf["title"], ctf["link"], str(ctf["id"]), date_str)
@@ -95,25 +114,13 @@ def check_ctfs(bot, job):
             message = "*New CTF announced:*\n" + message
             for element in groups:
                 bot.sendMessage(element, text=message, parse_mode='MARKDOWN', disable_web_page_preview=True)
-    
-    to_delete = []
-    for ctf_id in e_db:
-        ctf = e_db[ctf_id]
-        if parser.parse(ctf["start_date"]) < datetime.now():
-            to_delete.append(ctf_id)
-            
-    for d in to_delete:
-        del e_db[d]
-    
-    with open(db, 'w') as f:
-        yaml.dump(e_db, f)
 
 
 def alarm(bot, job):
     """Function to send the reminder message"""
     message = ""
     
-    ctf = e_db.get(job.context["ctf_id"])
+    ctf = events.get(job.context["ctf_id"])
     if ctf is None:
         message = 'Something went wrong with reminder of '+str(job.context["ctf_id"])
     else:
@@ -123,13 +130,11 @@ def alarm(bot, job):
 
 
 def start(bot, update, job_queue):
+    """This function is required. Without this your bot will not load any CTF"""
     groups.add(update.message.chat_id)
     with open(groups_db, 'w') as f:
         yaml.dump(groups, f)
 
-    """This function is required. Without this your bot will not load any CTF"""
-    global running
-    running = True
     job = Job(check_ctfs, repeatsec, repeat=True, context=update.message.chat_id)
     job_queue.put(job)
     update.message.reply_text('Hi! I will notify you when new CTFs are announced and let you remind them!')
@@ -137,22 +142,21 @@ def start(bot, update, job_queue):
 
 def ping(bot, update):
     """Classic ping command"""
-    global running
-    message = "I'm not running! Start me with `/start`"
-    if running is True:
+    message = "I'm not running in this group! Start me with `/start`"
+    if update.message.chat_id in groups:
         message = "Pong, here is the flag: `PeqNP{NoobsProof}`"
     update.message.reply_text(message,parse_mode='MARKDOWN')
     
 
 def remind(bot, update, args, job_queue, chat_data):
+    """Adds a job to the queue"""
     if CheckGroupWhitelist(bot,update) is False:
         return
-    """Adds a job to the queue"""
-    global running
+
     chat_id = update.message.chat_id
-        
-    if running is False:
-        update.message.reply_text("I'm not running! Start me with `/start`",parse_mode='MARKDOWN')
+
+    if chat_id not in groups:
+        update.message.reply_text("I'm not running in this group! Start me with `/start`",parse_mode='MARKDOWN')
         return
 
     try:
@@ -160,7 +164,7 @@ def remind(bot, update, args, job_queue, chat_data):
             update.message.reply_text('Usage: `/remind <ctf_id>`',parse_mode='MARKDOWN')
             return
         
-        ctf = e_db.get(args[0])
+        ctf = events.get(args[0])
         if ctf is None:
             update.message.reply_text('I can\'t find a CTF with this id')
             return
@@ -193,9 +197,10 @@ def remind(bot, update, args, job_queue, chat_data):
 
 
 def unset(bot, update, args, chat_data):
+    """Removes the job if the user changed their mind"""
     if CheckGroupWhitelist(bot,update) is False:
         return
-    """Removes the job if the user changed their mind"""
+
     if len(args) != 1 :
         update.message.reply_text('Usage: `/unset <ctf_id>`',parse_mode='MARKDOWN')
         return
@@ -222,8 +227,8 @@ def unset(bot, update, args, chat_data):
 def listctf(bot, update):
     """List all CTFs in database"""
     message = ""
-    for ctf_id in e_db:
-        ctf = e_db[ctf_id]
+    for ctf_id in events:
+        ctf = events[ctf_id]
         date = parser.parse(ctf["start_date"])
         date_str = "{:%d-%m-%Y}".format(date)
         message += "[{0}]({1}) ({2}) - _{3}_\n".format(ctf["title"], ctf["link"], str(ctf["id"]), date_str)
@@ -231,19 +236,21 @@ def listctf(bot, update):
     if message is not "":
         message = "*All future Events:*\n" + message
         bot.sendMessage(update.message.chat_id, text=message, parse_mode='MARKDOWN', disable_web_page_preview=True)
+    else:
+        bot.sendMessage(update.message.chat_id, text="No CTF present in the DB")
 
 
 def remindctf(bot, update):
+    """List all CTFs that will be reminded"""
     if CheckGroupWhitelist(bot,update) is False:
         return
     
-    """List all CTFs that will be reminded"""
     message = ""
     
     # Get and sort by date list of CTF to remind
     ctf_list = []
     for ctf_id in reminded:
-        ctf_list.append(e_db[ctf_id])
+        ctf_list.append(events[ctf_id])
     ctf_list = sorted(ctf_list, key=lambda i: i['start_date'])
 
     for ctf in ctf_list:
@@ -254,30 +261,64 @@ def remindctf(bot, update):
     if message is not "":
         message = "*Events with Reminders:*\n" + message
         bot.sendMessage(update.message.chat_id, text=message, parse_mode='MARKDOWN', disable_web_page_preview=True)
+    else:
+        bot.sendMessage(update.message.chat_id, text="No CTF reminder set")    
 
 
 def upcomingctf(bot, update):
     """List 5 upcoming CTFs in database"""
-    message = "*Upcoming events:*\n"
-    upcoming_ctfs = []
-    for ctf_id in e_db:
-        upcoming_ctfs.append([e_db[ctf_id]["id"],e_db[ctf_id]["start_date"]])
+    message = ""
 
-    upcoming_ctfs.sort(key=lambda x: x[1])
+    upcoming_ctfs = []
+    for ctf_id in events:
+        upcoming_ctfs.append(events[ctf_id])
+    upcoming_ctfs = sorted(upcoming_ctfs, key=lambda i: i['start_date'])
 
     i = 0
-    for ctf_id in upcoming_ctfs:
+    for ctf in upcoming_ctfs:
         if i>=5:
             break
-        ctf = e_db[ctf_id[0]]
         date = parser.parse(ctf["start_date"])
         date_str = "{:%d-%m-%Y %H:%M UTC}".format(date)
         message += "[{0}]({1}) ({2})\nStarting Date: *{3}*\n\n".format(ctf["title"], ctf["link"], str(ctf["id"]), date_str)
         i+=1
 
     if message is not "":
+        message = "*Upcoming events:*\n" + message
         bot.sendMessage(update.message.chat_id, text=message, parse_mode='MARKDOWN', disable_web_page_preview=True)
+    else:
+        bot.sendMessage(update.message.chat_id, text="No upcoming CTF")    
 
+
+def currentctf(bot, update):
+    """List current running CTFs in database"""
+    message = ""
+
+    running_ctfs = []
+    for ctf_id in events:
+        ctf = events[ctf_id]
+        start_date = parser.parse(ctf["start_date"])
+        due = start_date-datetime.now()
+        due = int(due.total_seconds())
+        if due < 0:
+            finish_date = parser.parse(ctf["finish_date"])
+            due = finish_date-datetime.now()
+            due = int(due.total_seconds())
+            if due > 0:
+                running_ctfs.append(ctf)
+    running_ctfs = sorted(running_ctfs, key=lambda i: i['finish_date'])
+    # sort by finish_date, first the CTF that will finish sooner
+
+    for ctf in running_ctfs:
+        date = parser.parse(ctf["finish_date"])
+        date_str = "{:%d-%m-%Y %H:%M UTC}".format(date)
+        message += "[{0}]({1}) ({2})\nFinishing Date: *{3}*\n\n".format(ctf["title"], ctf["link"], str(ctf["id"]), date_str)
+
+    if message is not "":
+        message = "*Now running events:*\n" + message
+        bot.sendMessage(update.message.chat_id, text=message, parse_mode='MARKDOWN', disable_web_page_preview=True)    
+    else:
+        bot.sendMessage(update.message.chat_id, text="No CTF is currently running")    
 
 
 def info(bot, update, args):
@@ -286,17 +327,19 @@ def info(bot, update, args):
         update.message.reply_text('Usage: `/info <ctf_id>`', parse_mode='MARKDOWN')
         return
     
-    ctf = e_db.get(args[0])
+    ctf = events.get(args[0])
     if ctf is None:
         update.message.reply_text('I can\'t find a CTF with this id')
         return
         
-    date = parser.parse(ctf["start_date"])
+    start_date = parser.parse(ctf["start_date"])
+    finish_date = parser.parse(ctf["finish_date"])
     
     message = "[{0}]({1})\n".format(ctf["title"], ctf["link"])
     message += "Type: *"+ctf["format_text"]+(" On site" if ctf["onsite"] else " Online")+"*\n"
     message += "Restriction: *"+ctf["restrictions"]+"*\n"
-    message += "Start Date: *{:%d/%m/%Y %H:%M} UTC*\n".format(date)
+    message += "Start Date: *{:%d/%m/%Y %H:%M} UTC*\n".format(start_date)
+    message += "Finish Date: *{:%d/%m/%Y %H:%M} UTC*\n".format(finish_date)
     update.message.reply_text(message, parse_mode='MARKDOWN', disable_web_page_preview=True)
     
 
@@ -318,6 +361,11 @@ def error(bot, update, error):
 
 
 def main():
+    events = loadYamlFile(feed_db)
+    groups = loadYamlFile(groups_db)
+
+    update_data()
+
     bot = telegram.Bot(TOKEN)
     updater = Updater(TOKEN)
 
@@ -336,6 +384,8 @@ def main():
     dp.add_handler(CommandHandler("unset", unset, pass_args=True, pass_chat_data=True))
     dp.add_handler(CommandHandler("list", listctf))
     dp.add_handler(CommandHandler("upcoming", upcomingctf))
+    dp.add_handler(CommandHandler("now", currentctf))
+    dp.add_handler(CommandHandler("current", currentctf))
     dp.add_handler(CommandHandler("toremind", remindctf))
     dp.add_handler(CommandHandler("info", info, pass_args=True))
     # log all errors
