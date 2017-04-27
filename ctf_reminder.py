@@ -250,7 +250,8 @@ def remindctf(bot, update):
     # Get and sort by date list of CTF to remind
     ctf_list = []
     for ctf_id in reminded:
-        ctf_list.append(events[ctf_id])
+        if is_in_db(ctf_id):
+            ctf_list.append(events[ctf_id])
     ctf_list = sorted(ctf_list, key=lambda i: i['start_date'])
 
     for ctf in ctf_list:
@@ -271,7 +272,8 @@ def upcomingctf(bot, update):
 
     upcoming_ctfs = []
     for ctf_id in events:
-        upcoming_ctfs.append(events[ctf_id])
+        if parser.parse(events[ctf_id]['start_date']) > datetime.now():
+            upcoming_ctfs.append(events[ctf_id])
     upcoming_ctfs = sorted(upcoming_ctfs, key=lambda i: i['start_date'])
 
     i = 0
