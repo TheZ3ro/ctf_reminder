@@ -8,6 +8,8 @@ import telegram
 from telegram import *
 from telegram.ext import *
 from dateutil import parser
+from pytz import timezone
+import pytz
 #from sets import Set
 
 from datetime import datetime, timedelta
@@ -41,6 +43,14 @@ def loadYamlFile(filename):
     except FileNotFoundError:
         with open(filename,'w+') as f:
             f.write("")
+
+
+def toCESTtime(utctime):
+    utc = pytz.utc
+    rome = timezone('Europe/Rome')
+    utc_dt = utctime.replace(tzinfo=utc)
+    rome_time = utc_dt.astimezone(rome)
+    return "{:%d-%m-%Y %H:%M %Z}".format(rome_time)
 
 
 def CheckGroupWhitelist(bot,update):
@@ -87,7 +97,7 @@ def update_data():
     to_delete = []
     for ctf_id in events:
         ctf = events[ctf_id]
-        if parser.parse(ctf["finish_date"]) < datetime.now():
+        if parser.parse(ctf["finish_date"]) < datetime.utcnow():
             to_delete.append(ctf_id)
             
     for d in to_delete:
@@ -108,8 +118,7 @@ def check_ctfs(bot, job):
         for ctf_id in posts_to_print:
             ctf = events.get(ctf_id)
             date = parser.parse(ctf["start_date"])
-            date_str = "{:%d-%m-%Y %H:%M UTC}".format(date)
-            message += "[{0}]({1}) ({2})\nStarting Date: *{3}*\n\n".format(ctf["title"], ctf["link"], str(ctf["id"]), date_str)
+            message += "[{0}]({1}) ({2})\nStarting Date: *{3}*\n\n".format(ctf["title"], ctf["link"], str(ctf["id"]), toCESTtime(date))
         if message is not "":
             message = "*New CTF announced:*\n" + message
             for element in groups:
@@ -170,7 +179,7 @@ def remind(bot, update, args, job_queue, chat_data):
             return
         
         date = parser.parse(ctf["start_date"])
-        due = date-datetime.now()
+        due = date-datetime.utcnow()
         due = int(due.total_seconds())
         if due < 0:
             update.message.reply_text('Sorry we can not go back to future! Seconds: '+str(due))
@@ -230,8 +239,7 @@ def listctf(bot, update):
     for ctf_id in events:
         ctf = events[ctf_id]
         date = parser.parse(ctf["start_date"])
-        date_str = "{:%d-%m-%Y}".format(date)
-        message += "[{0}]({1}) ({2}) - _{3}_\n".format(ctf["title"], ctf["link"], str(ctf["id"]), date_str)
+        message += "[{0}]({1}) ({2}) - _{3}_\n".format(ctf["title"], ctf["link"], str(ctf["id"]), toCESTtime(date))
 
     if message is not "":
         message = "*All future Events:*\n" + message
@@ -256,8 +264,7 @@ def remindctf(bot, update):
 
     for ctf in ctf_list:
         date = parser.parse(ctf["start_date"])
-        date_str = "{:%d-%m-%Y %H:%M UTC}".format(date)
-        message += "[{0}]({1}) ({2})\nStarting Date: *{3}*\n\n".format(ctf["title"], ctf["link"], str(ctf["id"]), date_str)
+        message += "[{0}]({1}) ({2})\nStarting Date: *{3}*\n\n".format(ctf["title"], ctf["link"], str(ctf["id"]), toCESTtime(date))
 
     if message is not "":
         message = "*Events with Reminders:*\n" + message
@@ -272,7 +279,7 @@ def upcomingctf(bot, update):
 
     upcoming_ctfs = []
     for ctf_id in events:
-        if parser.parse(events[ctf_id]['start_date']) > datetime.now():
+        if parser.parse(events[ctf_id]['start_date']) > datetime.utcnow():
             upcoming_ctfs.append(events[ctf_id])
     upcoming_ctfs = sorted(upcoming_ctfs, key=lambda i: i['start_date'])
 
@@ -281,8 +288,7 @@ def upcomingctf(bot, update):
         if i>=5:
             break
         date = parser.parse(ctf["start_date"])
-        date_str = "{:%d-%m-%Y %H:%M UTC}".format(date)
-        message += "[{0}]({1}) ({2})\nStarting Date: *{3}*\n\n".format(ctf["title"], ctf["link"], str(ctf["id"]), date_str)
+        message += "[{0}]({1}) ({2})\nStarting Date: *{3}*\n\n".format(ctf["title"], ctf["link"], str(ctf["id"]), toCESTtime(date))
         i+=1
 
     if message is not "":
@@ -300,11 +306,11 @@ def currentctf(bot, update):
     for ctf_id in events:
         ctf = events[ctf_id]
         start_date = parser.parse(ctf["start_date"])
-        due = start_date-datetime.now()
+        due = start_date-datetime.utcnow()
         due = int(due.total_seconds())
         if due < 0:
             finish_date = parser.parse(ctf["finish_date"])
-            due = finish_date-datetime.now()
+            due = finish_date-datetime.utcnow()
             due = int(due.total_seconds())
             if due > 0:
                 running_ctfs.append(ctf)
@@ -313,8 +319,7 @@ def currentctf(bot, update):
 
     for ctf in running_ctfs:
         date = parser.parse(ctf["finish_date"])
-        date_str = "{:%d-%m-%Y %H:%M UTC}".format(date)
-        message += "[{0}]({1}) ({2})\nFinishing Date: *{3}*\n\n".format(ctf["title"], ctf["link"], str(ctf["id"]), date_str)
+        message += "[{0}]({1}) ({2})\nFinishing Date: *{3}*\n\n".format(ctf["title"], ctf["link"], str(ctf["id"]), toCESTtime(date))
 
     if message is not "":
         message = "*Now running events:*\n" + message
