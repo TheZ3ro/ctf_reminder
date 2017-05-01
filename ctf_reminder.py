@@ -345,8 +345,8 @@ def info(bot, update, args):
     message = "[{0}]({1})\n".format(ctf["title"], ctf["link"])
     message += "Type: *"+ctf["format_text"]+(" On site" if ctf["onsite"] else " Online")+"*\n"
     message += "Restriction: *"+ctf["restrictions"]+"*\n"
-    message += "Start Date: *{:%d/%m/%Y %H:%M} UTC*\n".format(start_date)
-    message += "Finish Date: *{:%d/%m/%Y %H:%M} UTC*\n".format(finish_date)
+    message += "Start Date: *{0}*\n".format(toCESTtime(start_date))
+    message += "Finish Date: *{0}*\n".format(toCESTtime(finish_date))
     update.message.reply_text(message, parse_mode='MARKDOWN', disable_web_page_preview=True)
     
 
