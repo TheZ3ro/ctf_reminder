@@ -346,6 +346,7 @@ def info(bot, update, args):
     message += "Type: *"+ctf["format_text"]+(" On site" if ctf["onsite"] else " Online")+"*\n"
     message += "Restriction: *"+ctf["restrictions"]+"*\n"
     message += "Url: "+ctf["url"]+"\n"
+    message += "Weight: "+ctf["weight"]+"\n"
     message += "Start Date: *{0}*\n".format(toCESTtime(start_date))
     message += "Finish Date: *{0}*\n".format(toCESTtime(finish_date))
     update.message.reply_text(message, parse_mode='MARKDOWN', disable_web_page_preview=True)
