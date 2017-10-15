@@ -28,7 +28,7 @@ groups_db = './groups.yaml'
 events = {}
 groups = set()
 
-TOKEN = "" #insert bot token here
+TOKEN = "308167645:AAHAOc3PYhLDEjrShVPHW7_QTBWNBmBT1Ns" #insert bot token here
 group_whitelist = [] #insert group id here
 repeatsec = 12*3600
 reminded = set()
@@ -59,7 +59,6 @@ def CheckGroupWhitelist(bot,update):
         return False
     return True
 
-        
 def is_in_db(ctf_id):
     """Helper function to check if a CTF is in the db"""
     if events.get(ctf_id) is None:
@@ -238,8 +237,9 @@ def listctf(bot, update):
     message = ""
     for ctf_id in events:
         ctf = events[ctf_id]
-        date = parser.parse(ctf["start_date"])
-        message += "[{0}]({1}) ({2}) - _{3}_\n".format(ctf["title"], ctf["link"], str(ctf["id"]), toCESTtime(date))
+        start_date = parser.parse(ctf["start_date"])
+        end_date = parser.parse(ctf["finish_date"])
+        message += "[{0}]({1}) ({2})\nStart: _{3}_\nEnd: _{4}_\n".format(ctf["title"], ctf["link"], str(ctf["id"]), toCESTtime(start_date), toCESTtime(end_date))
 
     if message is not "":
         message = "*All future Events:*\n" + message
@@ -345,6 +345,7 @@ def info(bot, update, args):
     message = "[{0}]({1})\n".format(ctf["title"], ctf["link"])
     message += "Type: *"+ctf["format_text"]+(" On site" if ctf["onsite"] else " Online")+"*\n"
     message += "Restriction: *"+ctf["restrictions"]+"*\n"
+    message += "Url: "+ctf["url"]+"\n"
     message += "Start Date: *{0}*\n".format(toCESTtime(start_date))
     message += "Finish Date: *{0}*\n".format(toCESTtime(finish_date))
     update.message.reply_text(message, parse_mode='MARKDOWN', disable_web_page_preview=True)
