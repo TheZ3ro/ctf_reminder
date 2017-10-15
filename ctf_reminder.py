@@ -28,7 +28,7 @@ groups_db = './groups.yaml'
 events = {}
 groups = set()
 
-TOKEN = "308167645:AAHAOc3PYhLDEjrShVPHW7_QTBWNBmBT1Ns" #insert bot token here
+TOKEN = "" #insert bot token here
 group_whitelist = [] #insert group id here
 repeatsec = 12*3600
 reminded = set()
@@ -77,6 +77,8 @@ def update_data():
         event = {}
         event["title"] = post.title
         event["link"] = post.id
+        event["url"] = post.url
+        event["weight"] = post.weight
         event["format_text"] = post.format_text
         event["format"] = int(post.format)
         event["onsite"] = not bool(post.onsite)
