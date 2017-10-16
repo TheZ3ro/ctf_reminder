@@ -2,6 +2,7 @@
 # -*- coding: utf-8 -*-
 
 # pip3 install feedparser python-telegram-bot python-dateutil
+import os
 import feedparser
 import yaml
 import telegram
@@ -28,7 +29,7 @@ groups_db = './groups.yaml'
 events = {}
 groups = set()
 
-TOKEN = "" #insert bot token here
+TOKEN = os.environ['BOT_TOKEN'] #insert bot token here
 group_whitelist = [] #insert group id here
 repeatsec = 12*3600
 reminded = set()
