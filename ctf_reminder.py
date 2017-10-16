@@ -11,7 +11,6 @@ from telegram.ext import *
 from dateutil import parser
 from pytz import timezone
 import pytz
-#from sets import Set
 
 from datetime import datetime, timedelta
 import logging
@@ -29,7 +28,7 @@ groups_db = './groups.yaml'
 events = {}
 groups = set()
 
-TOKEN = os.environ['BOT_TOKEN'] #insert bot token here
+TOKEN = os.environ['BOT_TOKEN']
 group_whitelist = [] #insert group id here
 repeatsec = 12*3600
 reminded = set()
@@ -146,8 +145,8 @@ def start(bot, update, job_queue):
     with open(groups_db, 'w') as f:
         yaml.dump(groups, f)
 
-    job = Job(check_ctfs, repeatsec, repeat=True, context=update.message.chat_id)
-    job_queue.put(job)
+    job = job_queue.run_repeating(check_ctfs,repeatsec,context=update.message.chat_id)
+
     update.message.reply_text('Hi! I will notify you when new CTFs are announced and let you remind them!')
 
 
