@@ -354,6 +354,19 @@ def info(bot, update, args):
     update.message.reply_text(message, parse_mode='MARKDOWN', disable_web_page_preview=True)
     
 
+def score_calculator(bot,update,args):
+    if len(args) == 5 :
+        total_teams = int(args[3])
+        team_points = int(args[1])
+        best_points = int(args[0])
+        team_place = int(args[2])
+        weight = float(args[4])
+
+        points_coef = team_points/best_points
+        place_coef = 1/team_place
+        rating = ((points_coef + place_coef)*weight)/(1/(1+team_place/total_teams))
+        update.message.reply_text(rating)
+
 def usage(bot, update):
     message = "*CTF Reminder* will remind your CTF as they start!\n"
     message += "`/start` to start the reminder\n"
@@ -363,13 +376,13 @@ def usage(bot, update):
     message += "`/info <ctf_id>` to get info for specific CTF\n"
     message += "`/remind <ctf_id>` to set a CTF reminder\n"
     message += "`/unset <ctf_id>` to unset a CTF reminder\n"
+    message += "`/score <best points> <team points> <team place> <total teams> <ctf weight>` calculate the points\n"
     message += "`/ping` to check if the reminder is started\n"
     update.message.reply_text(message,parse_mode='MARKDOWN')
     
 
 def error(bot, update, error):
     logger.warning('Update "%s" caused error "%s"' % (update, error))
-
 
 def main():
     events = loadYamlFile(feed_db)
@@ -399,6 +412,7 @@ def main():
     dp.add_handler(CommandHandler("current", currentctf))
     dp.add_handler(CommandHandler("toremind", remindctf))
     dp.add_handler(CommandHandler("info", info, pass_args=True))
+    dp.add_handler(CommandHandler("score",score_calculator, pass_args=True))
     # log all errors
     dp.add_error_handler(error)
 
