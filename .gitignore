@@ -1,5 +1,4 @@
-feeds.yaml
-groups.yaml
+*.yaml
 
 # Byte-compiled / optimized / DLL files
 __pycache__/
