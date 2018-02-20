@@ -149,9 +149,8 @@ class GroupDb(object):
     groups_db = "./groups.yaml"
 
     def __init__(self):
+        self.groups = set()
         self.load()
-        if self.groups is None:
-            self.groups = set()
 
     def load(self):
         """Load groups from backup file"""

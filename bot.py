@@ -23,16 +23,17 @@ def error(bot, update, error):
     logger.warning('Update "%s" caused error "%s"' % (update, error))
 
 
-def start(bot, update, job_queue):
+def start(bot, update):
     """Start the bot reminder about starting and announced CTF"""
     groups.add(update.message.chat_id)
     update.message.reply_text('Hi! I will notify you when new CTFs \
 are announced and remind them!')
 
 
-def stop(bot, update, job_queue):
+def stop(bot, update):
     """Start the bot reminder about starting and announced CTF"""
-    groups.add(update.message.chat_id)
+    groups.remove(update.message.chat_id)
+    update.message.reply_text('Stopped')
 
 
 def fetch(bot, job):
@@ -152,7 +153,7 @@ def main():
 
     # on different commands - answer in Telegram
     dp.add_handler(CommandHandler("start", start))
-    dp.add_handler(CommandHandler("start", start))
+    dp.add_handler(CommandHandler("stop", stop))
     dp.add_handler(CommandHandler("upcoming", upcoming))
     dp.add_handler(CommandHandler("now", current))
     dp.add_handler(CommandHandler("current", current))
