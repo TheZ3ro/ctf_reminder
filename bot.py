@@ -48,7 +48,7 @@ def fetch(bot, job):
 
     if message is not "":
         message = "*New CTF announced:*\n" + message
-        for element in groups:
+        for element in groups.groups:
             bot.sendMessage(element,
                             text=message,
                             parse_mode='MARKDOWN',
@@ -67,7 +67,7 @@ def starting(bot, job):
 
     if message is not "":
         message = "*The following CTF are starting in less than 24 hours:*\n" + message
-        for element in groups:
+        for element in groups.groups:
             bot.sendMessage(element,
                             text=message,
                             parse_mode='MARKDOWN',
